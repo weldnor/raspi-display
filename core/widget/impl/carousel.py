@@ -3,19 +3,17 @@ from typing import Optional, List
 from PIL import Image
 
 from core.interface.observer import Observer
-from core.widget.widget import Widget
+from core.widget.abstract_widget import AbstractWidget
 
 
-class Carousel(Widget, Observer):
-    def __init__(self, x, y):
+class Carousel(AbstractWidget, Observer):
+    def __init__(self):
         super().__init__()
-        self._x = x
-        self._y = y
-        self.widgets: List[Widget] = []
-        self.current_widget: Optional[Widget] = None
+        self.widgets: List[AbstractWidget] = []
+        self.current_widget: Optional[AbstractWidget] = None
         self.position = 0
 
-    def add_widget(self, widget: Widget):
+    def add_widget(self, widget: AbstractWidget):
         # Подписываемся только на 1 виджет
         if len(self.widgets) == 0:
             widget.subscribe(self)
@@ -34,23 +32,15 @@ class Carousel(Widget, Observer):
         self.current_widget.subscribe(self)
         self.notify_observers()
 
-    def draw(self, image: Image) -> Image:
+    def draw(self, x: int, y: int, image: Image) -> Image:
         if len(self.widgets) == 0:
             raise Exception("oops! no widgets to draw")
 
-        current_widget: Widget = self.widgets[self.position]
-        current_widget.set_x(self._x)
-        current_widget.set_y(self._y)
-        return current_widget.draw(image)
+        current_widget: AbstractWidget = self.widgets[self.position]
+        return current_widget.draw(x, y, image)
 
     def update(self) -> None:
         self.notify_observers()
-
-    def get_x(self) -> int:
-        return self._x
-
-    def get_y(self) -> int:
-        return self._y
 
     def get_width(self) -> int:
         return self.current_widget.get_width()

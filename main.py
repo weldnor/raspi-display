@@ -1,10 +1,10 @@
 import time
 
 from core.display import Display
-from simple_window import SimpleWindow
+from my_scene import MyScene
 
-window = SimpleWindow()
-display = Display(window)
+scene = MyScene()
+display = Display(scene)
 
 while 1:
     time.sleep(1)

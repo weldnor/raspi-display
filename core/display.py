@@ -1,13 +1,15 @@
+import threading
+import time
 from threading import Lock
 
-import RPi.GPIO as GPIO
 from PIL import Image
 from PIL import ImageDraw
+from RPi import GPIO
 
 from core.event.key_event import KeyEvent, KeyType
-from core.window.window import Window
-from lib import SH1106
 from core.interface.observer import Observer
+from core.window.abstract_scene import AbstractScene
+from lib import SH1106
 
 RST_PIN = 25
 CS_PIN = 8
@@ -25,25 +27,27 @@ KEY3_PIN = 16
 
 
 class Display(Observer):
-    display: SH1106 = None
-    image: Image = None
-    drawer: ImageDraw = None
-    lock = Lock()
+    def __init__(self, scene: AbstractScene):
+        self._scene = scene
+        self._display: SH1106 = None
+        self._image: Image = None
+        self._drawer: ImageDraw = None
+        self._lock = Lock()
 
-    def __init__(self, window: Window):
-        self.window = window
         self._init_gpio()
         self._init_display()
 
-        window.subscribe(self)
-        self.image = window.draw(self.image)
+        scene.subscribe(self)
+        self.update()
+
+        self._listen_gpio()
 
     def _init_display(self) -> None:
-        self.display = SH1106.SH1106()
-        self.display.Init()
-        self.display.clear()
-        self.image = Image.new('1', (self.display.width, self.display.height), "WHITE")
-        self.drawer = ImageDraw.Draw(self.image)
+        self._display = SH1106.SH1106()
+        self._display.Init()
+        self._display.clear()
+        self._image = Image.new('1', (self._display.width, self._display.height), "WHITE")
+        self._drawer = ImageDraw.Draw(self._image)
 
     def _init_gpio(self) -> None:
         GPIO.setmode(GPIO.BCM)
@@ -56,37 +60,52 @@ class Display(Observer):
         GPIO.setup(KEY2_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(KEY3_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-        GPIO.add_event_detect(KEY_UP_PIN, GPIO.RISING, callback=self._on_key_pressed, bouncetime=200)
-        GPIO.add_event_detect(KEY_DOWN_PIN, GPIO.RISING, callback=self._on_key_pressed, bouncetime=200)
-        GPIO.add_event_detect(KEY_LEFT_PIN, GPIO.RISING, callback=self._on_key_pressed, bouncetime=200)
-        GPIO.add_event_detect(KEY_RIGHT_PIN, GPIO.RISING, callback=self._on_key_pressed, bouncetime=200)
-        GPIO.add_event_detect(KEY_PRESS_PIN, GPIO.RISING, callback=self._on_key_pressed, bouncetime=200)
-        GPIO.add_event_detect(KEY1_PIN, GPIO.RISING, callback=self._on_key_pressed, bouncetime=200)
-        GPIO.add_event_detect(KEY2_PIN, GPIO.RISING, callback=self._on_key_pressed, bouncetime=200)
-        GPIO.add_event_detect(KEY3_PIN, GPIO.RISING, callback=self._on_key_pressed, bouncetime=200)
+    def _listen_gpio(self):
+        def loop():  # TODO refactor me!
+            while True:
+                if not GPIO.input(KEY_UP_PIN):
+                    self._on_key_pressed(KEY_UP_PIN)
+                if not GPIO.input(KEY_DOWN_PIN):
+                    self._on_key_pressed(KEY_DOWN_PIN)
+                if not GPIO.input(KEY_LEFT_PIN):
+                    self._on_key_pressed(KEY_LEFT_PIN)
+                if not GPIO.input(KEY_RIGHT_PIN):
+                    self._on_key_pressed(KEY_RIGHT_PIN)
+                if not GPIO.input(KEY_PRESS_PIN):
+                    self._on_key_pressed(KEY_PRESS_PIN)
+                if not GPIO.input(KEY1_PIN):
+                    self._on_key_pressed(KEY1_PIN)
+                if not GPIO.input(KEY2_PIN):
+                    self._on_key_pressed(KEY2_PIN)
+                if not GPIO.input(KEY3_PIN):
+                    self._on_key_pressed(KEY3_PIN)
+                time.sleep(0.1)
+
+        t = threading.Thread(loop())
+        t.start()
 
     def _on_key_pressed(self, code):
         if code == KEY_UP_PIN:
-            self.window.on_key_pressed(KeyEvent(KeyType.KEY_UP))
+            self._scene.on_key_pressed(KeyEvent(KeyType.KEY_UP))
         if code == KEY_DOWN_PIN:
-            self.window.on_key_pressed(KeyEvent(KeyType.KEY_DOWN))
+            self._scene.on_key_pressed(KeyEvent(KeyType.KEY_DOWN))
         if code == KEY_LEFT_PIN:
-            self.window.on_key_pressed(KeyEvent(KeyType.KEY_LEFT))
+            self._scene.on_key_pressed(KeyEvent(KeyType.KEY_LEFT))
         if code == KEY_RIGHT_PIN:
-            self.window.on_key_pressed(KeyEvent(KeyType.KEY_RIGHT))
+            self._scene.on_key_pressed(KeyEvent(KeyType.KEY_RIGHT))
         if code == KEY_PRESS_PIN:
-            self.window.on_key_pressed(KeyEvent(KeyType.KEY_PRESS))
+            self._scene.on_key_pressed(KeyEvent(KeyType.KEY_PRESS))
         if code == KEY1_PIN:
-            self.window.on_key_pressed(KeyEvent(KeyType.KEY1))
+            self._scene.on_key_pressed(KeyEvent(KeyType.KEY1))
         if code == KEY2_PIN:
-            self.window.on_key_pressed(KeyEvent(KeyType.KEY2))
+            self._scene.on_key_pressed(KeyEvent(KeyType.KEY2))
         if code == KEY3_PIN:
-            self.window.on_key_pressed(KeyEvent(KeyType.KEY3))
+            self._scene.on_key_pressed(KeyEvent(KeyType.KEY3))
 
     def update(self) -> None:
-        with self.lock:
-            self.drawer.rectangle([(0, 0), (128, 64)], fill=1)  # очищаем дисплей
-            self.image = self.window.draw(self.image)
+        with self._lock:
+            self._drawer.rectangle([(0, 0), (128, 64)], fill=1)  # очищаем дисплей
+            self._image = self._scene.draw(self._image)
             # так так мы каждый раз обновляем изображение, то нам придется создавать новый ImageDraw
-            self.drawer = ImageDraw.Draw(self.image)
-            self.display.ShowImage(self.display.getbuffer(self.image))
+            self._drawer = ImageDraw.Draw(self._image)
+            self._display.ShowImage(self._display.getbuffer(self._image))

@@ -4,7 +4,7 @@ import threading
 from PIL import ImageFont, Image
 from PIL.ImageDraw import ImageDraw
 
-from core.widget.widget import Widget
+from core.widget.abstract_widget import AbstractWidget
 
 
 class RepeatTimer(threading.Timer):
@@ -13,33 +13,29 @@ class RepeatTimer(threading.Timer):
             self.function(*self.args, **self.kwargs)
 
 
-class Clock(Widget):
-    def __init__(self, x, y, height, width):
+def get_current_time_as_string() -> str:
+    now = datetime.datetime.now()
+    return now.strftime("%Y-%m-%d %H:%M:%S")
+
+
+class Clock(AbstractWidget):
+    def __init__(self):
         super().__init__()
-        self._x = x
-        self._y = y
-        self._height = height
-        self._width = width
         self._font = ImageFont.truetype('resources/Font.ttf', 10)
         RepeatTimer(0.8, self.update).start()
 
     def update(self):
         self.notify_observers()
 
-    def draw(self, image: Image) -> Image:
+    def draw(self, x: int, y: int, image: Image) -> Image:
         drawer = ImageDraw(image)
         now = datetime.datetime.now()
-        drawer.text((self._x, self._y), now.strftime("%Y-%m-%d %H:%M:%S"), font=self._font)
+        drawer.text((x, y), now.strftime("%Y-%m-%d %H:%M:%S"), font=self._font)
         return image
 
-    def get_x(self) -> int:
-        return self._x
-
-    def get_y(self) -> int:
-        return self._y
-
+    # TODO check me
     def get_width(self) -> int:
-        return self._width
+        return self._font.getsize(get_current_time_as_string(), font=self._font)[0]
 
     def get_height(self) -> int:
-        return self._height
+        return self._font.getsize(get_current_time_as_string(), font=self._font)[1]
